@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Nauka tabliczki mnożenia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leader-line/1.0.7/leader-line.min.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; }
+  .container {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    height: 80vh;
+    padding: 20px;
+  }
+  .column {
+    width: 45%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .word {
+    padding: 8px 12px;
+    margin: 10px;
+    border: 1px solid black;
+    background-color: #f9f9f9;
+    cursor: pointer;
+    user-select: none;
+    font-size: 150%;
+    transition: background-color 0.3s, border-color 0.3s;
+  }
+  .selected {
+    background-color: blue;
+    color: white;
+  }
+  button {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-top: 20px;
+  }
+  #checkButton {
+    position: fixed;
+    right: 20px;
+    bottom: 60px; /* Adjusted to accommodate the status bar */
+  }
+  #refreshButton {
+    position: fixed;
+    left: 20px;
+    bottom: 60px; /* Adjusted to accommodate the status bar */
+  }
+  #setupSection {
+    text-align: center;
+    margin-top: 20px;
+  }
+  #statusBar {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background-color: #f1f1f1;
+    text-align: center;
+    padding: 10px;
+    border-top: 1px solid #ccc;
+  }
+</style>
+</head>
+<body>
+<h1 style="text-align:center;">Dopasuj działanie do wyniku</h1>
+
+<div id="setupSection">
+  <label for="numProblems">Liczba działań: </label>
+  <input type="number" id="numProblems" value="12" min="1" max="100">
+  <button onclick="initializeProblems()">Zatwierdź</button>
+</div>
+
+<div class="container" id="problemsContainer" style="display:none;">
+  <div class="column" id="mathProblems"></div>
+  <div class="column" id="mathResults"></div>
+</div>
+<button id="checkButton" onclick="checkAnswers()" style="display:none;">Sprawdź odpowiedzi</button>
+<button id="refreshButton" onclick="confirmRefresh()" style="display:none;">Odśwież stronę</button>
+
+<div id="statusBar">Autor: zolwikC Krystian Staśkiewicz</div>
+
+<script>
+  let problems = [];
+  let lastSelected = null;
+  const lines = [];
+  const connections = new Map();
+
+  // Funkcja generująca losowe działania matematyczne do 10x10
+  function generateRandomProblems(count) {
+    const generatedProblems = [];
+    for (let i = 0; i < count; i++) {
+      const a = Math.floor(Math.random() * 10) + 1;
+      const b = Math.floor(Math.random() * 10) + 1;
+      generatedProblems.push({ problem: `${a} × ${b}`, result: (a * b).toString() });
+    }
+    return generatedProblems;
+  }
+
+  // Funkcja mieszająca elementy w tablicy
+  function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
+
+  // Funkcja ustawiająca działania i wyniki w kolumnach
+  function setupProblems() {
+    const problemColumn = document.getElementById('mathProblems');
+    const resultColumn = document.getElementById('mathResults');
+    problemColumn.innerHTML = '';
+    resultColumn.innerHTML = '';
+
+    const problemWords = problems.map(item => ({ text: item.problem, type: 'problem' }));
+    const resultWords = problems.map(item => ({ text: item.result, type: 'result' }));
+    
+    shuffleArray(problemWords);
+    shuffleArray(resultWords);
+
+    // Dodaj działania do kolumny
+    problemWords.forEach(item => {
+      const div = document.createElement('div');
+      div.textContent = item.text;
+      div.className = 'word';
+      problemColumn.appendChild(div);
+      div.addEventListener('click', () => connectWords(div, item.text, item.type));
+    });
+
+    // Dodaj wyniki do kolumny
+    resultWords.forEach(item => {
+      const div = document.createElement('div');
+      div.textContent = item.text;
+      div.className = 'word';
+      resultColumn.appendChild(div);
+      div.addEventListener('click', () => connectWords(div, item.text, item.type));
+    });
+  }
+
+  // Funkcja łącząca wybrane elementy
+  function connectWords(div, text, type) {
+    if (lastSelected && lastSelected !== div && lastSelected.type !== type) {
+      const line = new LeaderLine(lastSelected.div, div, { endPlug: 'arrow3', startSocket: 'right', endSocket: 'left', color: 'black', size: 2 });
+      lines.push(line);
+      connections.set(line, { start: lastSelected.text, end: text });
+      lastSelected.div.classList.remove('selected');
+      lastSelected = null;
+    } else {
+      if (lastSelected) {
+        lastSelected.div.classList.remove('selected');
+      }
+      lastSelected = { div, text, type };
+      div.classList.add('selected');
+    }
+  }
+
+  // Funkcja sprawdzająca poprawność połączeń
+  function checkAnswers() {
+    lines.forEach(line => {
+      const pair = connections.get(line);
+      if (problems.find(item => item.problem === pair.start && item.result === pair.end) || problems.find(item => item.result === pair.start && item.problem === pair.end)) {
+        line.setOptions({ color: 'green' });
+      } else {
+        line.setOptions({ color: 'red' });
+      }
+    });
+  }
+
+  // Funkcja z potwierdzeniem przed odświeżeniem strony
+  function confirmRefresh() {
+    if (confirm("Czy na pewno chcesz odświeżyć stronę? Wszystkie połączenia zostaną utracone.")) {
+      location.reload();
+    }
+  }
+
+  // Funkcja inicjalizująca problemy na podstawie liczby działań
+  function initializeProblems() {
+    const numProblems = document.getElementById('numProblems').value;
+    problems = generateRandomProblems(numProblems);
+    setupProblems();
+    document.getElementById('problemsContainer').style.display = 'flex';
+    document.getElementById('checkButton').style.display = 'block';
+    document.getElementById('refreshButton').style.display = 'block';
+  }
+
+  window.onload = () => {
+    document.getElementById('numProblems').value = 12;
+  };
+</script>
+</body>
+</html>
